@@ -2,6 +2,17 @@ import streamlit as st
 
 st.set_page_config(page_title="Monitor Ouro Macro", page_icon="🪙", layout="wide")
 
+# ---- BARRA LATERAL (ALERTA REATIVADO E DESTACADO) ----
+st.sidebar.title("🚨 Alertas de Monitoramento")
+st.sidebar.info("Este painel ajuda você a acompanhar os gatilhos macro e choques geopolíticos que afetam o ouro em tempo real.")
+
+# Caixa vermelha de atenção máxima na barra lateral
+st.sidebar.error("""
+⚠️ **Fique atento:** 
+Qualquer nova escalada militar ou colapso total nas negociações de trégua no Golfo fará com que o Brent busque a faixa de US$ 107-115, o que mudará instantaneamente a dinâmica técnica do ouro.
+""")
+
+# ---- CORPO PRINCIPAL DO APP ----
 st.title("🪙 Painel de Monitoramento Macro: Impacto no Ouro")
 st.markdown("Consolidação de dados econômicos dos EUA, Riscos Geopolíticos, Petróleo Brent e Cenários do Payroll.")
 st.divider()
