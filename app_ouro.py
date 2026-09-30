@@ -1,7 +1,7 @@
 import streamlit as st
 import streamlit.components.v1 as components
 
-# Configuração visual do painel (Layout Expandido)
+# Configuração visual do painel
 st.set_page_config(page_title="Monitor Ouro Macro", page_icon="🪙", layout="wide")
 
 # ---- BARRA LATERAL (ALERTA EM DESTAQUE) ----
@@ -18,48 +18,22 @@ st.title("🪙 Painel de Monitoramento Macro: Impacto no Ouro")
 st.markdown("Consolidação de dados econômicos dos EUA, Riscos Geopolíticos, Petróleo Brent e Cenários do Payroll.")
 st.divider()
 
-# ---- SEÇÃO 1: PAINÉIS DE PREÇO EM TEMPO REAL (SEM DELAY) ----
+# ---- SEÇÃO 1: PAINÉIS DE PREÇO EM TEMPO REAL VIA IFRAME SEGURO ----
 st.header("📊 Dados de Mercado Atuais (TradingView Live Feed)")
-st.caption("Os blocos abaixo estão conectados diretamente aos servidores da OANDA e ICE, atualizando em tempo real.")
+st.caption("Os blocos abaixo utilizam a conexão direta de iframe da OANDA e ICE, atualizando em tempo real.")
 
-# Criação de duas colunas para embutir os painéis individuais do TradingView
+# Criação de duas colunas para os blocos lado a lado
 col_ouro_live, col_brent_live = st.columns(2)
 
 with col_ouro_live:
-    # Painel Oficial do Ouro à Vista (XAU/USD) da OANDA
-    ouro_widget_html = """
-    <div class="tradingview-widget-container">
-      <div class="tradingview-widget-container__widget"></div>
-      <script type="text/javascript" src="https://tradingview.com" async>
-      {
-      "symbol": "OANDA:XAUUSD",
-      "width": "100%",
-      "isTransparent": false,
-      "colorTheme": "light",
-      "locale": "br"
-    }
-      </script>
-    </div>
-    """
-    components.html(ouro_widget_html, height=130)
+    # URL oficial de widget de cotação única do TradingView para Ouro Spot (OANDA)
+    ouro_url = "https://tradingview.com"
+    components.iframe(ouro_url, height=130, scrolling=False)
 
 with col_brent_live:
-    # Painel Oficial do Petróleo Brent Spot
-    brent_widget_html = """
-    <div class="tradingview-widget-container">
-      <div class="tradingview-widget-container__widget"></div>
-      <script type="text/javascript" src="https://tradingview.com" async>
-      {
-      "symbol": "ICEEURORE:BRN1!",
-      "width": "100%",
-      "isTransparent": false,
-      "colorTheme": "light",
-      "locale": "br"
-    }
-      </script>
-    </div>
-    """
-    components.html(brent_widget_html, height=130)
+    # URL oficial de widget de cotação única do TradingView para Petróleo Brent (ICE)
+    brent_url = "https://tradingview.com"
+    components.iframe(brent_url, height=130, scrolling=False)
 
 st.divider()
 
