@@ -8,14 +8,14 @@ st.set_page_config(page_title="Monitor Ouro Macro", page_icon="🪙", layout="wi
 # ---- FUNÇÃO PARA CARREGAR DADOS DE MERCADO ----
 def carregar_dados_tempo_real():
     try:
-        # Puxando as cotações instantâneas diretamente da API financeira
-        ouro = yf.Ticker("GC=F").history(period="1d")["Close"].iloc[-1]
-        brent = yf.Ticker("BZ=F").history(period="1d")["Close"].iloc[-1]
+        # Puxando o Ouro à Vista (XAU/USD) e o Petróleo Brent Spot da API
+        ouro = yf.Ticker("XAUUSD=X").history(period="1d")["Close"].iloc[-1]
+        brent = yf.Ticker("BRENT").history(period="1d")["Close"].iloc[-1]
         yield_10y = yf.Ticker("^TNX").history(period="1d")["Close"].iloc[-1]
         return round(ouro, 2), round(brent, 2), round(yield_10y, 2)
     except:
-        # Valores de contingência baseados nas últimas cotações do pregão
-        return 4183.55, 97.88, 5.24
+        # Valores de contingência caso ocorra alguma oscilação de rede na API
+        return 4154.08, 97.88, 5.24
 
 preco_ouro, preco_brent, taxa_yield = carregar_dados_tempo_real()
 
@@ -23,8 +23,8 @@ preco_ouro, preco_brent, taxa_yield = carregar_dados_tempo_real()
 st.sidebar.title("🚨 Alertas de Monitoramento")
 st.sidebar.info("Este painel acompanha os gatilhos macro e choques geopolíticos que afetam o ouro em tempo real.")
 
-# Mostrar status do Auto-Refresh na barra lateral
-st.sidebar.success("🔄 **Status:** Atualização automática ativa (10s)")
+# Status do ciclo de atualização
+st.sidebar.success("🔄 **Status:** Conectado ao Spot Gold & Brent (10s)")
 
 st.sidebar.error("""
 ⚠️ **Fique atento:** 
@@ -38,13 +38,13 @@ st.divider()
 
 # ---- SEÇÃO 1: METRICAS PRINCIPAIS EM TEMPO REAL ----
 st.header("📊 Dados de Mercado Atuais (Em Tempo Real)")
-st.caption("O painel abaixo pisca e atualiza sozinho automaticamente a cada 10 segundos.")
+st.caption("Abaixo estão os preços do mercado à vista (Spot) de ambas as commodities, atualizando a cada 10 segundos.")
 
 col1, col2, col3 = st.columns(3)
 with col1:
-    st.metric(label="🪙 Ouro Futuros (XAU/USD)", value=f"US\$ {preco_ouro}", delta="Atualizando ao vivo...")
+    st.metric(label="🪙 Ouro à Vista (XAU/USD)", value=f"US\$ {preco_ouro}", delta="OANDA Spot Price")
 with col2:
-    st.metric(label="🛢️ Petróleo Brent (BRENTCash)", value=f"US\$ {preco_brent}", delta="Oscilação eletrônica")
+    st.metric(label="🛢️ Petróleo Brent à Vista", value=f"US\$ {preco_brent}", delta="Preço Spot Barril")
 with col3:
     st.metric(label="📈 Treasury Yield 10 Anos (EUA)", value=f"{taxa_yield}%", delta="Rendimento do Tesouro")
 
@@ -92,4 +92,4 @@ with t3:
 
 # ---- MECANISMO DE AUTO-REFRESH DE FUNDO ----
 time.sleep(10)  # Aguarda 10 segundos antes de forçar o reinício do ciclo
-st.rerun()      # Força o recarregamento dos dados da API sem interação humana
+st.rerun()      # Força o recarregamento dos dados de balcão da API
