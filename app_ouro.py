@@ -1,30 +1,12 @@
 import streamlit as st
-import yfinance as yf
-import time
+import streamlit.components.v1 as components
 
-# Configuração visual do painel (Layout Otimizado)
+# Configuração visual do painel (Layout Expandido)
 st.set_page_config(page_title="Monitor Ouro Macro", page_icon="🪙", layout="wide")
 
-# ---- FUNÇÃO PARA CARREGAR DADOS DE MERCADO ----
-def carregar_dados_tempo_real():
-    try:
-        # Tickers contínuos oficiais de alta liquidez eletrônica
-        ouro = yf.Ticker("GC=F").history(period="1d")["Close"].iloc[-1]
-        brent = yf.Ticker("BZ=F").history(period="1d")["Close"].iloc[-1]
-        yield_10y = yf.Ticker("^TNX").history(period="1d")["Close"].iloc[-1]
-        return round(ouro, 2), round(brent, 2), round(yield_10y, 2)
-    except:
-        # Valores de contingência baseados nas últimas cotações estáveis
-        return 4183.55, 97.88, 5.24
-
-preco_ouro, preco_brent, taxa_yield = carregar_dados_tempo_real()
-
-# ---- BARRA LATERAL (ALERTAS E CONTROLE) ----
+# ---- BARRA LATERAL (ALERTA EM DESTAQUE) ----
 st.sidebar.title("🚨 Alertas de Monitoramento")
 st.sidebar.info("Este painel acompanha os gatilhos macro e choques geopolíticos que afetam o ouro em tempo real.")
-
-# Status do ciclo de atualização automatizado
-st.sidebar.success("🔄 **Status:** Conectado ao Fluxo Líquido (10s)")
 
 st.sidebar.error("""
 ⚠️ **Fique atento:** 
@@ -36,21 +18,52 @@ st.title("🪙 Painel de Monitoramento Macro: Impacto no Ouro")
 st.markdown("Consolidação de dados econômicos dos EUA, Riscos Geopolíticos, Petróleo Brent e Cenários do Payroll.")
 st.divider()
 
-# ---- SEÇÃO 1: METRICAS PRINCIPAIS EM TEMPO REAL ----
-st.header("📊 Dados de Mercado Atuais (Em Tempo Real)")
-st.caption("O painel abaixo recalcula e atualiza as cotações eletrônicas globais a cada 10 segundos.")
+# ---- SEÇÃO 1: PAINÉIS DE PREÇO EM TEMPO REAL (SEM DELAY) ----
+st.header("📊 Dados de Mercado Atuais (TradingView Live Feed)")
+st.caption("Os blocos abaixo estão conectados diretamente aos servidores da OANDA e ICE, atualizando em tempo real.")
 
-col1, col2, col3 = st.columns(3)
-with col1:
-    st.metric(label="🪙 Ouro Futuros Líquido (COMEX)", value=f"US\$ {preco_ouro}", delta="Atualizando ao vivo...")
-with col2:
-    st.metric(label="🛢️ Petróleo Brent Líquido (ICE)", value=f"US\$ {preco_brent}", delta="Oscilação Eletrônica")
-with col3:
-    st.metric(label="📈 Treasury Yield 10 Anos (EUA)", value=f"{taxa_yield}%", delta="Rendimento do Tesouro")
+# Criação de duas colunas para embutir os painéis individuais do TradingView
+col_ouro_live, col_brent_live = st.columns(2)
+
+with col_ouro_live:
+    # Painel Oficial do Ouro à Vista (XAU/USD) da OANDA
+    ouro_widget_html = """
+    <div class="tradingview-widget-container">
+      <div class="tradingview-widget-container__widget"></div>
+      <script type="text/javascript" src="https://tradingview.com" async>
+      {
+      "symbol": "OANDA:XAUUSD",
+      "width": "100%",
+      "isTransparent": false,
+      "colorTheme": "light",
+      "locale": "br"
+    }
+      </script>
+    </div>
+    """
+    components.html(ouro_widget_html, height=130)
+
+with col_brent_live:
+    # Painel Oficial do Petróleo Brent Spot
+    brent_widget_html = """
+    <div class="tradingview-widget-container">
+      <div class="tradingview-widget-container__widget"></div>
+      <script type="text/javascript" src="https://tradingview.com" async>
+      {
+      "symbol": "ICEEURORE:BRN1!",
+      "width": "100%",
+      "isTransparent": false,
+      "colorTheme": "light",
+      "locale": "br"
+    }
+      </script>
+    </div>
+    """
+    components.html(brent_widget_html, height=130)
 
 st.divider()
 
-# ---- SEÇÃO 2: DADOS ECONÔMICOS FIXOS E NÍVEIS TÉCNICOS ----
+# ---- SEÇÃO 2: DADOS ECONÔMICOS E NÍVEIS TÉCNICOS ----
 col_macro, col_tecnica = st.columns(2)
 
 with col_macro:
@@ -89,7 +102,3 @@ with t2:
 with t3:
     st.error("### Acima de 130k a 140k vagas: Ouro em QUEDA (Risco de buscar US\$ 4.100)")
     st.write("A economia aquecida força os yields a romperem a máxima de 5,30%, gerando liquidação pesada no ouro.")
-
-# ---- MECANISMO DE AUTO-REFRESH DE FUNDO ----
-time.sleep(10)  # Aguarda 10 segundos antes de forçar o reinício do ciclo
-st.rerun()      # Força o recarregamento dos dados de alta liquidez da API
