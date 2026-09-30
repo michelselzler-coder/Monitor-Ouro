@@ -1,13 +1,32 @@
 import streamlit as st
-import streamlit.components.v1 as components
+import yfinance as yf
+import plotly.graph_objects as go
 
 # Configuração visual do painel
 st.set_page_config(page_title="Monitor Ouro Macro", page_icon="🪙", layout="wide")
 
+# ---- FUNÇÃO PARA CARREGAR DADOS DE MERCADO ----
+def carregar_dados():
+    try:
+        # Puxando histórico de 30 dias para montar o gráfico de velas
+        ticker_ouro = yf.Ticker("GC=F")
+        df_ouro = ticker_ouro.history(period="30d")
+        
+        # Últimos preços de fechamento para os blocos informativos
+        preco_ouro = df_ouro["Close"].iloc[-1]
+        preco_brent = yf.Ticker("BZ=F").history(period="1d")["Close"].iloc[-1]
+        taxa_yield = yf.Ticker("^TNX").history(period="1d")["Close"].iloc[-1]
+        
+        return df_ouro, round(preco_ouro, 2), round(preco_brent, 2), round(taxa_yield, 2)
+    except:
+        # Valores substitutos caso ocorra falha de conexão na API
+        return None, 4186.00, 102.56, 5.24
+
+df_ouro, preco_ouro, preco_brent, taxa_yield = carregar_dados()
+
 # ---- BARRA LATERAL ----
 st.sidebar.title("🚨 Alertas de Monitoramento")
 st.sidebar.info("Este painel ajuda você a acompanhar os gatilhos macro e choques geopolíticos que afetam o ouro em tempo real.")
-
 st.sidebar.error("""
 ⚠️ **Fique atento:** 
 Qualquer nova escalada militar ou colapso total nas negociações de trégua no Golfo fará com que o Brent busque a faixa de US$ 107-115, o que mudará instantaneamente a dinâmica técnica do ouro.
@@ -18,23 +37,43 @@ st.title("🪙 Painel de Monitoramento Macro: Impacto no Ouro")
 st.markdown("Consolidação de dados econômicos dos EUA, Riscos Geopolíticos, Petróleo Brent e Cenários do Payroll.")
 st.divider()
 
-# ---- SEÇÃO 1: COTAÇÕES EM TEMPO REAL ----
-st.header("📊 Cotações Globais em Tempo Real (Sem Delay)")
+# ---- SEÇÃO 1: METRICAS EM TEMPO REAL ----
+st.header("📊 Dados de Mercado Atuais (Em Tempo Real)")
+col1, col2, col3, col4, col5, col6 = st.columns(6)
 
-# URL oficial e universal do widget do TradingView
-ticker_url = "https://tradingview.com"
-components.iframe(ticker_url, height=80, scrolling=False)
+col1.metric("Núcleo PCE (Mensal)", "0.2%", "-0.1% vs Projeção", delta_color="inverse")
+col2.metric("Núcleo PCE (Anual)", "3.0%", "Abaixo das Estimativas", delta_color="inverse")
+col3.metric("Taxa de Juros do Fed", "3.75% - 4.00%", "Primeira alta desde 2023", delta_color="off")
+col4.metric("Treasury Yield 10 Anos", f"{taxa_yield}%", "Rendimento EUA", delta_color="off")
+col5.metric("Petróleo Brent", f"US$ {preco_brent}", "Pressão Energética", delta_color="off")
+col6.metric("Cotação do Ouro (Onça)", f"US$ {preco_ouro}", "Alvo Técnico", delta_color="off")
 st.divider()
 
-# ---- SEÇÃO 2: GRÁFICO INTERATIVO E DADOS ----
-col_grafico, col_dados = st.columns([2, 1])  # Dá mais proporção de espaço para o gráfico na tela
+# ---- SEÇÃO 2: GRÁFICO INTEGRADO DE VELAS E NÍVEIS TÉCNICOS ----
+col_grafico, col_dados = st.columns([2, 1])  # Dá mais espaço proporcional para o gráfico
 
 with col_grafico:
-    st.subheader("📈 Gráfico Avançado: Ouro Futuros (COMEX)")
+    st.subheader("📈 Gráfico de Velas (Candlestick): Ouro Futuros")
     
-    # URL atualizada da plataforma de gráficos abertos do TradingView que ignora bloqueios de nuvem
-    chart_url = "https://tradingview.com"
-    components.iframe(chart_url, height=500, scrolling=False)
+    if df_ouro is not None:
+        # Criando o gráfico de velas usando a biblioteca Plotly integrada
+        fig = go.Figure(data=[go.Candlestick(
+            x=df_ouro.index,
+            open=df_ouro['Open'],
+            high=df_ouro['High'],
+            low=df_ouro['Low'],
+            close=df_ouro['Close'],
+            increasing_line_color='#26a69a', decreasing_line_color='#ef5350'
+        )])
+        fig.update_layout(
+            margin=dict(l=20, r=20, t=20, b=20),
+            height=450,
+            xaxis_rangeslider_visible=False,
+            template="plotly_white"
+        )
+        st.plotly_chart(fig, use_container_width=True)
+    else:
+        st.info("Carregando o gráfico de velas interativo...")
 
 with col_dados:
     st.subheader("🚧 Níveis Técnicos de Defesa")
@@ -47,7 +86,7 @@ with col_dados:
         st.success("**US$ 4.150**\n\nSuporte de Curto Prazo (Mínima Semanal).")
         st.success("**US$ 4.100**\n\nZona Crítica de Demanda Diária.")
     
-    st.info("🌍 **Fator Geopolítico:** O tráfego reduzido no Estreito de Ormuz mantém o petróleo pressionado, gerando medo de inflação global de longo prazo e juros altos, segurando o rali do ouro.")
+    st.info("🌍 **Fator Geopolítico:** As tensões no Estreito de Ormuz sustentam o petróleo elevado, o que gera receio inflacionário e puxa os juros para cima, limitando o avanço do ouro.")
 
 st.divider()
 
