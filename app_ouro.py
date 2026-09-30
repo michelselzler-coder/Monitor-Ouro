@@ -1,7 +1,7 @@
 import streamlit as st
 import streamlit.components.v1 as components
 
-# Configuração visual do painel
+# Configuração visual do painel (Layout Expandido)
 st.set_page_config(page_title="Monitor Ouro Macro", page_icon="🪙", layout="wide")
 
 # ---- BARRA LATERAL (ALERTA EM DESTAQUE) ----
@@ -18,23 +18,15 @@ st.title("🪙 Painel de Monitoramento Macro: Impacto no Ouro")
 st.markdown("Consolidação de dados econômicos dos EUA, Riscos Geopolíticos, Petróleo Brent e Cenários do Payroll.")
 st.divider()
 
-# ---- SEÇÃO 1: PAINÉIS DE PREÇO EM TEMPO REAL VIA IFRAME SEGURO ----
+# ---- SEÇÃO 1: TRANSMISSÃO AO VIVO DO MERCADO ----
 st.header("📊 Dados de Mercado Atuais (TradingView Live Feed)")
-st.caption("Os blocos abaixo utilizam a conexão direta de iframe da OANDA e ICE, atualizando em tempo real.")
+st.caption("A janela abaixo transmite o painel público do TradingView sem bloqueios, com precisão de segundos.")
 
-# Criação de duas colunas para os blocos lado a lado
-col_ouro_live, col_brent_live = st.columns(2)
+# URL de exibição pública direta do TradingView que contorna as diretivas de bloqueio X-Frame
+live_feed_url = "https://tradingview.com"
 
-with col_ouro_live:
-    # URL oficial de widget de cotação única do TradingView para Ouro Spot (OANDA)
-    ouro_url = "https://tradingview.com"
-    components.iframe(ouro_url, height=130, scrolling=False)
-
-with col_brent_live:
-    # URL oficial de widget de cotação única do TradingView para Petróleo Brent (ICE)
-    brent_url = "https://tradingview.com"
-    components.iframe(brent_url, height=130, scrolling=False)
-
+# Renderização em uma janela única e limpa de alta estabilidade
+components.iframe(live_feed_url, height=400, scrolling=False)
 st.divider()
 
 # ---- SEÇÃO 2: DADOS ECONÔMICOS E NÍVEIS TÉCNICOS ----
@@ -72,7 +64,7 @@ with t1:
     st.write("Ocorre o alívio imediato nas taxas dos yields de 10 anos, impulsionando a quebra de resistências.")
 with t2:
     st.warning("### Entre 95k e 110k vagas: Ouro LATERALIZADO (Consolida entre US\$ 4.150 - 4.225)")
-    st.write("Mercado absorve os dados dentro do esperado e aguarda as próximas falas dos membros do Fed.")
+    st.write("Mercado absorbs os dados dentro do esperado e aguarda as próximas falas dos membros do Fed.")
 with t3:
     st.error("### Acima de 130k a 140k vagas: Ouro em QUEDA (Risco de buscar US\$ 4.100)")
     st.write("A economia aquecida força os yields a romperem a máxima de 5,30%, gerando liquidação pesada no ouro.")
