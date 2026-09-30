@@ -18,23 +18,23 @@ st.title("🪙 Painel de Monitoramento Macro: Impacto no Ouro")
 st.markdown("Consolidação de dados econômicos dos EUA, Riscos Geopolíticos, Petróleo Brent e Cenários do Payroll.")
 st.divider()
 
-# ---- SEÇÃO 1: COTAÇÕES EM TEMPO REAL (CANAL SEGURO) ----
+# ---- SEÇÃO 1: COTAÇÕES EM TEMPO REAL ----
 st.header("📊 Cotações Globais em Tempo Real (Sem Delay)")
 
-# Usando uma URL de incorporação segura do TradingView para a fita de preços
+# URL oficial e universal do widget do TradingView
 ticker_url = "https://tradingview.com"
-components.iframe(ticker_url, height=50, scrolling=False)
+components.iframe(ticker_url, height=80, scrolling=False)
 st.divider()
 
 # ---- SEÇÃO 2: GRÁFICO INTERATIVO E DADOS ----
-col_grafico, col_dados = st.columns([2, 1])  # Dá mais espaço lateral para o gráfico aparecer grande
+col_grafico, col_dados = st.columns([2, 1])  # Dá mais proporção de espaço para o gráfico na tela
 
 with col_grafico:
     st.subheader("📈 Gráfico Avançado: Ouro Futuros (COMEX)")
     
-    # URL oficial de incorporação do gráfico técnico do TradingView (Evita bloqueios de script)
+    # URL atualizada da plataforma de gráficos abertos do TradingView que ignora bloqueios de nuvem
     chart_url = "https://tradingview.com"
-    components.iframe(chart_url, height=450, scrolling=False)
+    components.iframe(chart_url, height=500, scrolling=False)
 
 with col_dados:
     st.subheader("🚧 Níveis Técnicos de Defesa")
