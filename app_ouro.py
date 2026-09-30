@@ -4,7 +4,7 @@ import streamlit.components.v1 as components
 # Configuração visual do painel
 st.set_page_config(page_title="Monitor Ouro Macro", page_icon="🪙", layout="wide")
 
-# ---- BARRA LATERAL (ALERTA DESTACADO E REATIVADO) ----
+# ---- BARRA LATERAL ----
 st.sidebar.title("🚨 Alertas de Monitoramento")
 st.sidebar.info("Este painel ajuda você a acompanhar os gatilhos macro e choques geopolíticos que afetam o ouro em tempo real.")
 
@@ -18,72 +18,23 @@ st.title("🪙 Painel de Monitoramento Macro: Impacto no Ouro")
 st.markdown("Consolidação de dados econômicos dos EUA, Riscos Geopolíticos, Petróleo Brent e Cenários do Payroll.")
 st.divider()
 
-# ---- SEÇÃO 1: COTAÇÕES EM TEMPO REAL (TRADINGVIEW TICKER TAPE) ----
+# ---- SEÇÃO 1: COTAÇÕES EM TEMPO REAL (CANAL SEGURO) ----
 st.header("📊 Cotações Globais em Tempo Real (Sem Delay)")
 
-# Injeção do Widget de fita de preços do TradingView
-ticker_tape_html = """
-<div class="tradingview-widget-container">
-  <div class="tradingview-widget-container__widget"></div>
-  <script type="text/javascript" src="https://tradingview.com" async>
-  {
-  "symbols": [
-    {
-      "proName": "COMEX:GC1!",
-      "title": "Ouro Futuros (XAU)"
-    },
-    {
-      "proName": "NYMEX:CL1!",
-      "title": "Petróleo Crude NYMEX"
-    },
-    {
-      "proName": "TVC:US10Y",
-      "title": "Treasury US 10 Anos"
-    }
-  ],
-  "showSymbolLogo": true,
-  "colorTheme": "light",
-  "isTransparent": false,
-  "displayMode": "adaptive",
-  "locale": "br"
-}
-  </script>
-</div>
-"""
-components.html(ticker_tape_html, height=50)
+# Usando uma URL de incorporação segura do TradingView para a fita de preços
+ticker_url = "https://tradingview.com"
+components.iframe(ticker_url, height=50, scrolling=False)
 st.divider()
 
-# ---- SEÇÃO 2: GRÁFICO INTERATIVO DO OURO ----
-col_grafico, col_dados = st.columns([2, 1])
+# ---- SEÇÃO 2: GRÁFICO INTERATIVO E DADOS ----
+col_grafico, col_dados = st.columns([2, 1])  # Dá mais espaço lateral para o gráfico aparecer grande
 
 with col_grafico:
-    st.subheader("📈 Gráfico Avançado: Ouro à Vista (XAU/USD)")
+    st.subheader("📈 Gráfico Avançado: Ouro Futuros (COMEX)")
     
-    # Injeção do Gráfico Técnico do TradingView (Permite traçar linhas e mudar tempo técnico)
-    chart_html = """
-    <div class="tradingview-widget-container" style="height:100%;width:100%">
-      <div id="tradingview_gold_chart" style="height:450px;width:100%"></div>
-      <script type="text/javascript" src="https://tradingview.com"></script>
-      <script type="text/javascript">
-      new TradingView.widget({
-        "width": "100%",
-        "height": 450,
-        "symbol": "COMEX:GC1!",
-        "interval": "D",
-        "timezone": "America/Sao_Paulo",
-        "theme": "light",
-        "style": "1",
-        "locale": "br",
-        "toolbar_bg": "#f1f3f6",
-        "enable_publishing": false,
-        "hide_side_toolbar": false,
-        "allow_symbol_change": true,
-        "container_id": "tradingview_gold_chart"
-      });
-      </script>
-    </div>
-    """
-    components.html(chart_html, height=460)
+    # URL oficial de incorporação do gráfico técnico do TradingView (Evita bloqueios de script)
+    chart_url = "https://tradingview.com"
+    components.iframe(chart_url, height=450, scrolling=False)
 
 with col_dados:
     st.subheader("🚧 Níveis Técnicos de Defesa")
