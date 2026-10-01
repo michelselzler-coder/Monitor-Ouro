@@ -1,91 +1,738 @@
 import streamlit as st
 import yfinance as yf
+import pandas as pd
+from datetime import datetime
 
-# Configuração visual do painel
-st.set_page_config(page_title="Monitor Ouro Macro", page_icon="🪙", layout="wide")
+# ============================================================
+# CONFIGURAÇÃO
+# ============================================================
 
-# ---- FUNÇÃO PARA CARREGAR DADOS DE MERCADO ----
-def carregar_dados_ao_vivo():
+st.set_page_config(
+    page_title="Monitor Ouro Macro",
+    page_icon="🪙",
+    layout="wide",
+    initial_sidebar_state="expanded",
+)
+
+# ============================================================
+# CONSTANTES
+# ============================================================
+
+ATIVOS = {
+    "ouro": "GC=F",       # Gold Futures
+    "brent": "BZ=F",      # Brent Futures
+    "yield_10y": "^TNX",  # US 10Y Treasury Yield
+}
+
+# Níveis técnicos configuráveis
+NIVEIS_OURO = {
+    "resistencias": [4225, 4250, 4300],
+    "suportes": [4150, 4100],
+}
+
+# ============================================================
+# ESTILO
+# ============================================================
+
+st.markdown(
+    """
+    <style>
+
+    .main {
+        background-color: #0e1117;
+    }
+
+    .block-container {
+        padding-top: 1.5rem;
+        padding-bottom: 2rem;
+    }
+
+    [data-testid="stMetric"] {
+        background-color: #161b22;
+        border: 1px solid #30363d;
+        padding: 15px;
+        border-radius: 10px;
+    }
+
+    .status-ok {
+        color: #00d26a;
+        font-weight: bold;
+    }
+
+    .status-warning {
+        color: #f0b429;
+        font-weight: bold;
+    }
+
+    .status-error {
+        color: #ff4b4b;
+        font-weight: bold;
+    }
+
+    </style>
+    """,
+    unsafe_allow_html=True,
+)
+
+# ============================================================
+# FUNÇÕES DE MERCADO
+# ============================================================
+
+@st.cache_data(ttl=60, show_spinner=False)
+def carregar_ativo(ticker: str, periodo: str = "5d") -> pd.DataFrame:
+    """
+    Baixa dados de mercado do Yahoo Finance.
+
+    O cache expira a cada 60 segundos para evitar chamadas
+    excessivas à API.
+    """
+
     try:
-        # Baixando os dados eletrônicos mais recentes sem cache
-        ouro_spot = yf.Ticker("GC=F").history(period="1d")["Close"].iloc[-1]
-        brent_spot = yf.Ticker("BZ=F").history(period="1d")["Close"].iloc[-1]
-        yield_10y = yf.Ticker("^TNX").history(period="1d")["Close"].iloc[-1]
-        return round(ouro_spot, 2), round(brent_spot, 2), round(yield_10y, 2)
-    except:
-        # Valores de segurança caso a API sofra instabilidade temporária
-        return 4154.78, 97.88, 5.24
+        dados = yf.download(
+            ticker,
+            period=periodo,
+            interval="1m",
+            progress=False,
+            auto_adjust=False,
+            threads=False,
+        )
 
-preco_ouro, preco_brent, taxa_yield = carregar_dados_ao_vivo()
+        if dados.empty:
+            raise ValueError(f"Sem dados disponíveis para {ticker}")
 
-# ---- BARRA LATERAL ----
-st.sidebar.title("🚨 Alertas de Monitoramento")
-st.sidebar.info("Este painel acompanha os gatilhos macro e choques geopolíticos que afetam o ouro em tempo real.")
+        # Algumas versões do yfinance retornam MultiIndex.
+        if isinstance(dados.columns, pd.MultiIndex):
+            dados.columns = dados.columns.get_level_values(0)
 
-# Botão manual de alta frequência para o usuário forçar a atualização
-if st.sidebar.button("🔄 Atualizar Cotações Agora"):
+        dados = dados.dropna(subset=["Close"])
+
+        return dados
+
+    except Exception as erro:
+        raise RuntimeError(
+            f"Não foi possível carregar {ticker}: {erro}"
+        ) from erro
+
+
+def ultimo_preco(ticker: str):
+    """
+    Retorna último preço disponível.
+    """
+
+    dados = carregar_ativo(ticker)
+
+    if dados.empty:
+        return None
+
+    return float(dados["Close"].iloc[-1])
+
+
+def variacao_dia(ticker: str):
+    """
+    Calcula a variação percentual aproximada usando
+    os dois últimos fechamentos disponíveis.
+    """
+
+    dados = carregar_ativo(ticker)
+
+    if len(dados) < 2:
+        return None
+
+    anterior = float(dados["Close"].iloc[-2])
+    atual = float(dados["Close"].iloc[-1])
+
+    if anterior == 0:
+        return None
+
+    return ((atual / anterior) - 1) * 100
+
+
+# ============================================================
+# CARREGAMENTO DOS DADOS
+# ============================================================
+
+@st.cache_data(ttl=60, show_spinner=False)
+def carregar_mercado():
+    """
+    Carrega todos os ativos principais.
+    """
+
+    resultado = {
+        "ouro": None,
+        "brent": None,
+        "yield_10y": None,
+        "ouro_var": None,
+        "brent_var": None,
+        "yield_var": None,
+        "erros": [],
+    }
+
+    ativos = {
+        "ouro": "GC=F",
+        "brent": "BZ=F",
+        "yield_10y": "^TNX",
+    }
+
+    for nome, ticker in ativos.items():
+
+        try:
+            dados = carregar_ativo(ticker)
+
+            if dados.empty:
+                raise ValueError("Nenhum dado retornado.")
+
+            closes = dados["Close"].dropna()
+
+            atual = float(closes.iloc[-1])
+
+            resultado[nome] = atual
+
+            if len(closes) >= 2:
+                anterior = float(closes.iloc[-2])
+
+                if anterior != 0:
+                    resultado[f"{nome.split('_')[0]}_var"] = (
+                        (atual / anterior) - 1
+                    ) * 100
+
+        except Exception as erro:
+
+            resultado["erros"].append(
+                f"{nome}: {erro}"
+            )
+
+    return resultado
+
+
+# ============================================================
+# FUNÇÕES DE ANÁLISE
+# ============================================================
+
+def status_ouro(preco: float):
+    """
+    Determina a posição do ouro em relação aos níveis técnicos.
+    """
+
+    if preco is None:
+        return "Sem dados", "warning"
+
+    if preco >= 4300:
+        return "Acima da resistência principal", "ok"
+
+    if preco >= 4250:
+        return "Região de resistência", "warning"
+
+    if preco >= 4225:
+        return "Próximo da resistência", "warning"
+
+    if preco >= 4150:
+        return "Dentro da faixa de consolidação", "ok"
+
+    if preco >= 4100:
+        return "Próximo do suporte crítico", "warning"
+
+    return "Abaixo do suporte crítico", "error"
+
+
+def distancia_nivel(preco: float, nivel: float):
+    """
+    Calcula distância percentual até um nível técnico.
+    """
+
+    if preco is None or nivel == 0:
+        return None
+
+    return ((nivel - preco) / preco) * 100
+
+
+# ============================================================
+# SIDEBAR
+# ============================================================
+
+st.sidebar.title("🚨 Monitoramento")
+
+st.sidebar.info(
+    """
+    Este painel acompanha:
+
+    - Ouro
+    - Brent
+    - Treasury 10Y
+    - Níveis técnicos
+    - Cenários macro
+
+    Os preços são obtidos via Yahoo Finance.
+    """
+)
+
+# Botão de atualização manual
+if st.sidebar.button(
+    "🔄 Atualizar cotações agora",
+    use_container_width=True,
+):
+    carregar_ativo.clear()
+    carregar_mercado.clear()
     st.rerun()
 
-st.sidebar.error("""
-⚠️ **Fique atento:** 
-Qualquer nova escalada militar ou colapso total nas negociações de trégua no Golfo fará com que o Brent busque a faixa de US\$ 107-115, o que mudará instantaneamente a dinâmica técnica do ouro.
-""")
 
-# ---- CORPO PRINCIPAL DO APLICATIVO ----
-st.title("🪙 Painel de Monitoramento Macro: Impacto no Ouro")
-st.markdown("Consolidação de dados econômicos dos EUA, Riscos Geopolíticos, Petróleo Brent e Cenários do Payroll.")
+# Controle do intervalo de atualização
+intervalo = st.sidebar.selectbox(
+    "Frequência desejada",
+    [
+        "Manual",
+        "60 segundos",
+        "5 minutos",
+        "15 minutos",
+    ],
+    index=0,
+)
+
+st.sidebar.divider()
+
+st.sidebar.subheader("⚙️ Configurações")
+
+mostrar_graficos = st.sidebar.checkbox(
+    "Mostrar gráficos",
+    value=True,
+)
+
+mostrar_diagnostico = st.sidebar.checkbox(
+    "Mostrar diagnóstico",
+    value=False,
+)
+
+
+# ============================================================
+# DADOS
+# ============================================================
+
+dados = carregar_mercado()
+
+ouro = dados["ouro"]
+brent = dados["brent"]
+yield_10y = dados["yield_10y"]
+
+ouro_var = dados["ouro_var"]
+brent_var = dados["brent_var"]
+yield_var = dados["yield_var"]
+
+
+# ============================================================
+# CABEÇALHO
+# ============================================================
+
+st.title("🪙 Monitor Ouro Macro")
+
+st.markdown(
+    """
+    **Painel de acompanhamento de Ouro, Petróleo Brent,
+    Treasury 10Y e níveis técnicos.**
+    """
+)
+
 st.divider()
 
-# ---- SEÇÃO 1: MÉTRICAS NATIVAS (A PROVA DE BLOQUEIOS) ----
-st.header("📊 Dados de Mercado Atuais (Em Tempo Real)")
-st.markdown("*Clique no botão 'Atualizar Cotações Agora' na barra lateral para recalcular os preços instantaneamente.*")
 
-col1, col2, col3 = st.columns(3)
-with col1:
-    st.metric(label="🪙 Ouro / Dólar Americano (XAUUSD)", value=f"US\$ {preco_ouro}", delta="Preço de Balcão Eletrônico")
-with col2:
-    st.metric(label="🛢️ Petróleo Brent", value=f"US\$ {preco_brent}", delta="Pressão Energética")
-with col3:
-    st.metric(label="📈 Treasury Yield 10 Anos (EUA)", value=f"{taxa_yield}%", delta="Rendimento do Tesouro")
+# ============================================================
+# STATUS
+# ============================================================
+
+agora = datetime.now().strftime("%d/%m/%Y %H:%M:%S")
+
+col_status1, col_status2 = st.columns([3, 1])
+
+with col_status1:
+
+    if not dados["erros"]:
+        st.success(
+            f"🟢 Mercado carregado com sucesso • Atualizado em {agora}"
+        )
+    else:
+        st.warning(
+            f"🟡 Dados parcialmente carregados • {agora}"
+        )
+
+with col_status2:
+
+    st.caption(
+        "Fonte de preços: Yahoo Finance"
+    )
+
+
+# ============================================================
+# MÉTRICAS PRINCIPAIS
+# ============================================================
+
+st.header("📊 Mercado")
+
+c1, c2, c3 = st.columns(3)
+
+# -------------------------
+# OURO
+# -------------------------
+
+with c1:
+
+    delta_ouro = (
+        f"{ouro_var:+.2f}%"
+        if ouro_var is not None
+        else None
+    )
+
+    st.metric(
+        label="🪙 Ouro Futures — GC=F",
+        value=(
+            f"US$ {ouro:,.2f}"
+            if ouro is not None
+            else "N/D"
+        ),
+        delta=delta_ouro,
+    )
+
+# -------------------------
+# BRENT
+# -------------------------
+
+with c2:
+
+    delta_brent = (
+        f"{brent_var:+.2f}%"
+        if brent_var is not None
+        else None
+    )
+
+    st.metric(
+        label="🛢️ Brent Futures — BZ=F",
+        value=(
+            f"US$ {brent:,.2f}"
+            if brent is not None
+            else "N/D"
+        ),
+        delta=delta_brent,
+    )
+
+# -------------------------
+# TREASURY
+# -------------------------
+
+with c3:
+
+    delta_yield = (
+        f"{yield_var:+.2f}%"
+        if yield_var is not None
+        else None
+    )
+
+    st.metric(
+        label="📈 Treasury 10Y",
+        value=(
+            f"{yield_10y:.2f}%"
+            if yield_10y is not None
+            else "N/D"
+        ),
+        delta=delta_yield,
+    )
+
+
+# ============================================================
+# DIAGNÓSTICO DO OURO
+# ============================================================
 
 st.divider()
 
-# ---- SEÇÃO 2: DADOS ECONÔMICOS E NÍVEIS TÉCNICOS ----
-col_macro, col_tecnica = st.columns(2)
+st.header("🎯 Diagnóstico Técnico")
 
-with col_macro:
-    st.subheader("🇺🇸 Dados Macroeconômicos Atuais")
-    st.markdown("""
-    *   **Subida do Núcleo PCE (Mensal):** `0.2%` (Abaixo da projeção de 0.3%)
-    *   **Subida do Núcleo PCE (Anual):** `3.0%` (Aliviou temores de altas agressivas)
-    *   **Taxa de Juros do Fed:** `3.75% - 4.00%` (Taxa básica oficial)
-    """)
-    st.info("🌍 **Fator Geopolítico:** As tensões no Estreito de Ormuz sustentam o petróleo elevado, o que gera receio inflacionário de longo prazo e impede uma queda maior dos yields, limitando o avanço do ouro.")
+status, tipo = status_ouro(ouro)
 
-with col_tecnica:
-    st.subheader("🚧 Níveis Técnicos de Defesa do Ouro")
-    tab_res, tab_sup = st.tabs(["🔴 Resistências (Teto)", "🟢 Suportes (Chão)"])
-    with tab_res:
-        st.error("**US\$ 4.225** - Resistência Imediata (Máxima após o PCE)")
-        st.error("**US\$ 4.250** - Média Móvel Curta (Divisor de águas)")
-        st.error("**US\$ 4.300** - Teto Psicológico Semanal Principal")
-    with tab_sup:
-        st.success("**US\$ 4.150** - Suporte de Curto Prazo (Mínima defendida)")
-        st.success("**US\$ 4.100** - Região Crítica de Demanda Diária")
+if tipo == "ok":
+    st.success(f"🟢 {status}")
+
+elif tipo == "warning":
+    st.warning(f"🟡 {status}")
+
+else:
+    st.error(f"🔴 {status}")
+
+
+# ============================================================
+# DISTÂNCIA DOS NÍVEIS
+# ============================================================
+
+if ouro is not None:
+
+    col1, col2 = st.columns(2)
+
+    with col1:
+
+        st.subheader("🔴 Resistências")
+
+        for nivel in NIVEIS_OURO["resistencias"]:
+
+            distancia = distancia_nivel(ouro, nivel)
+
+            if distancia is not None:
+
+                if distancia >= 0:
+                    st.write(
+                        f"**US$ {nivel:,.0f}** "
+                        f"→ {distancia:+.2f}%"
+                    )
+                else:
+                    st.write(
+                        f"**US$ {nivel:,.0f}** "
+                        f"→ {distancia:+.2f}% já superado"
+                    )
+
+    with col2:
+
+        st.subheader("🟢 Suportes")
+
+        for nivel in NIVEIS_OURO["suportes"]:
+
+            distancia = distancia_nivel(ouro, nivel)
+
+            if distancia is not None:
+
+                st.write(
+                    f"**US$ {nivel:,.0f}** "
+                    f"→ {distancia:+.2f}%"
+                )
+
+
+# ============================================================
+# GRÁFICOS
+# ============================================================
+
+if mostrar_graficos:
+
+    st.divider()
+
+    st.header("📈 Histórico recente")
+
+    tab1, tab2, tab3 = st.tabs(
+        [
+            "🪙 Ouro",
+            "🛢️ Brent",
+            "📈 Treasury 10Y",
+        ]
+    )
+
+    with tab1:
+
+        try:
+
+            ouro_hist = carregar_ativo(
+                "GC=F",
+                periodo="5d",
+            )
+
+            st.line_chart(
+                ouro_hist["Close"],
+                height=350,
+            )
+
+        except Exception as erro:
+
+            st.error(
+                f"Erro ao carregar gráfico do ouro: {erro}"
+            )
+
+    with tab2:
+
+        try:
+
+            brent_hist = carregar_ativo(
+                "BZ=F",
+                periodo="5d",
+            )
+
+            st.line_chart(
+                brent_hist["Close"],
+                height=350,
+            )
+
+        except Exception as erro:
+
+            st.error(
+                f"Erro ao carregar gráfico do Brent: {erro}"
+            )
+
+    with tab3:
+
+        try:
+
+            yield_hist = carregar_ativo(
+                "^TNX",
+                periodo="5d",
+            )
+
+            st.line_chart(
+                yield_hist["Close"],
+                height=350,
+            )
+
+        except Exception as erro:
+
+            st.error(
+                f"Erro ao carregar gráfico do Treasury: {erro}"
+            )
+
+
+# ============================================================
+# CENÁRIOS PAYROLL
+# ============================================================
 
 st.divider()
 
-# ---- SEÇÃO 3: CHECKLIST INTERATIVO DO PAYROLL ----
-st.header("📅 Checklist de Cenários: Payroll (Sexta-feira, 02/10)")
-st.markdown("**Projeção de Consenso:** 98k vagas (Desaceleração frente às 162k anteriores)")
+st.header("📅 Cenários de Payroll")
 
-t1, t2, t3 = st.tabs(["🟢 Cenário 1: Payroll Fraco", "🟡 Cenário 2: Em Linha", "🔴 Cenário 3: Payroll Forte"])
+st.caption(
+    "Os intervalos abaixo são cenários configuráveis; "
+    "não representam uma previsão automática do mercado."
+)
+
+t1, t2, t3 = st.tabs(
+    [
+        "🟢 Payroll fraco",
+        "🟡 Payroll em linha",
+        "🔴 Payroll forte",
+    ]
+)
+
 with t1:
-    st.success("### Menos de 85k a 90k vagas: Ouro em ALTA (Alvo em romper US\$ 4.225)")
-    st.write("Ocorre o alívio imediato nas taxas dos yields de 10 anos, impulsionando a quebra de resistências.")
+
+    st.success(
+        "### Menos de 90 mil vagas"
+    )
+
+    st.write(
+        """
+        Cenário de desaceleração do mercado de trabalho.
+
+        Possíveis variáveis para monitorar:
+
+        - Treasury 10Y
+        - Dólar
+        - Expectativas de juros
+        - Ouro
+        """
+    )
+
+
 with t2:
-    st.warning("### Entre 95k e 110k vagas: Ouro LATERALIZADO (Consolida entre US\$ 4.150 - 4.225)")
-    st.write("Mercado absorve os dados dentro do esperado e aguarda as próximas falas dos membros do Fed.")
+
+    st.warning(
+        "### Entre 90 mil e 120 mil vagas"
+    )
+
+    st.write(
+        """
+        Cenário intermediário.
+
+        O foco passa para a combinação entre:
+
+        - Payroll
+        - Salários
+        - Taxa de desemprego
+        - Treasury
+        - Expectativas para o Fed
+        """
+    )
+
+
 with t3:
-    st.error("### Acima de 130k a 140k vagas: Ouro em QUEDA (Risco de buscar US\$ 4.100)")
-    st.write("A economia aquecida força os yields a romperem a máxima de 5,30%, gerando liquidação pesada no ouro.")
+
+    st.error(
+        "### Acima de 130 mil vagas"
+    )
+
+    st.write(
+        """
+        Cenário de mercado de trabalho mais forte.
+
+        Variáveis a acompanhar:
+
+        - Treasury 10Y
+        - Dólar
+        - Inflação implícita
+        - Expectativas de política monetária
+        """
+    )
+
+
+# ============================================================
+# MATRIZ MACRO
+# ============================================================
+
+st.divider()
+
+st.header("🌎 Matriz Macro")
+
+macro_data = pd.DataFrame(
+    {
+        "Indicador": [
+            "Ouro",
+            "Brent",
+            "Treasury 10Y",
+        ],
+        "Ticker": [
+            "GC=F",
+            "BZ=F",
+            "^TNX",
+        ],
+        "Valor": [
+            ouro,
+            brent,
+            yield_10y,
+        ],
+        "Variação": [
+            ouro_var,
+            brent_var,
+            yield_var,
+        ],
+    }
+)
+
+st.dataframe(
+    macro_data,
+    use_container_width=True,
+    hide_index=True,
+)
+
+
+# ============================================================
+# DIAGNÓSTICO
+# ============================================================
+
+if mostrar_diagnostico:
+
+    st.divider()
+
+    st.header("🔧 Diagnóstico")
+
+    st.write(
+        "Erros encontrados durante o carregamento:"
+    )
+
+    if dados["erros"]:
+        for erro in dados["erros"]:
+            st.error(erro)
+    else:
+        st.success(
+            "Nenhum erro encontrado."
+        )
+
+
+# ============================================================
+# RODAPÉ
+# ============================================================
+
+st.divider()
+
+st.caption(
+    """
+    ⚠️ Este painel é uma ferramenta de monitoramento.
+    Os dados de mercado podem apresentar atraso e/ou indisponibilidade.
+    Não constitui recomendação de investimento.
+    """
+)
